@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Example Root CA G1 — Root CA — HSM Key Generation</title>
+<style>
+:root {
+  --accent: #1a3a5c;
+  --accent-light: #2563a8;
+  --border: #d1d5db;
+  --code-bg: #1e1e2e;
+  --code-fg: #cdd6f4;
+  --code-comment: #6c7086;
+  --warn-bg: #fff7ed;
+  --warn-border: #fed7aa;
+  --warn-text: #7c2d12;
+  --ok-bg: #f0fdf4;
+  --ok-border: #bbf7d0;
+  --ok-text: #166534;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px; line-height: 1.6; color: #111;
+  background: #fff; padding: 40px 56px; max-width: 960px; margin: 0 auto;
+}
+.cover { text-align: center; border-bottom: 2px solid var(--accent); padding-bottom: 32px; margin-bottom: 32px; }
+.classification {
+  display: inline-block; background: var(--accent); color: #fff;
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  padding: 3px 14px; border-radius: 3px; margin-bottom: 20px;
+}
+.cover h1 { font-size: 22px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.cover h2 { font-size: 16px; font-weight: 400; color: #4b5563; margin-bottom: 20px; }
+.meta-grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 16px; text-align: left; max-width: 480px; margin: 0 auto; font-size: 13px; }
+.meta-grid .key { color: #6b7280; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 700; color: var(--accent); margin: 28px 0 10px; padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; page-break-after: avoid; }
+h4 { font-size: 13px; font-weight: 700; color: #374151; margin: 16px 0 6px; }
+p { font-size: 13px; color: #374151; margin-bottom: 8px; }
+ul, ol { padding-left: 20px; font-size: 13px; color: #374151; margin-bottom: 8px; }
+li { margin-bottom: 4px; }
+.checklist { list-style: none; padding-left: 0; }
+.checklist li { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.checklist li::before { content: "☐"; font-size: 14px; line-height: 1.4; flex-shrink: 0; color: #6b7280; }
+pre {
+  background: var(--code-bg); color: var(--code-fg);
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px; border-radius: 6px; padding: 14px 16px; margin: 10px 0;
+  overflow-x: auto; white-space: pre; line-height: 1.7;
+  page-break-inside: avoid;
+}
+.comment { color: var(--code-comment); }
+.step {
+  background: #f7f8fa; border-left: 3px solid var(--accent-light);
+  border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 10px 0;
+  page-break-inside: avoid;
+}
+.step-num { font-size: 11px; font-weight: 700; color: var(--accent-light); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.warn {
+  background: var(--warn-bg); border: 1px solid var(--warn-border);
+  border-radius: 6px; padding: 12px 14px; margin: 10px 0; font-size: 13px; color: var(--warn-text);
+}
+.warn strong { display: block; margin-bottom: 2px; }
+.ok {
+  background: var(--ok-bg); border: 1px solid var(--ok-border);
+  border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-size: 13px; color: var(--ok-text);
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+th { text-align: left; padding: 6px 10px; background: #f3f4f6; border: 1px solid var(--border); font-weight: 600; font-size: 12px; }
+td { padding: 7px 10px; border: 1px solid var(--border); vertical-align: top; }
+.sig-line { border-bottom: 1px solid #374151; min-height: 28px; }
+.mono { font-family: monospace; font-size: 11px; color: #6b7280; }
+.page-break { page-break-after: always; }
+
+.notes { margin: 14px 0; page-break-inside: avoid; }
+.notes strong { font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px; }
+.notes-area {
+  border: 1px solid var(--border); border-radius: 4px; min-height: 80px;
+  background: #fafafa;
+}
+
+@media print {
+  body { padding: 15mm 20mm; }
+  pre { background: #f8f8f8 !important; color: #111 !important; border: 1px solid #ccc; }
+  .comment { color: #666 !important; }
+  .notes-area { min-height: 100px; background: #fff !important; border: 1px solid #999; }
+}
+</style>
+</head>
+<body>
+
+
+<div class="cover">
+  <div class="classification">Key Ceremony Procedure</div>
+  <h1>Example Organisation AB</h1>
+  <h2>Example Root CA G1 · Root CA — HSM Key Generation</h2>
+  <div class="meta-grid">
+    <span class="key">Date</span>          <span>2026-05-11</span>
+    <span class="key">Location</span>      <span>Atle , Tulegan 11, Stockholm</span>
+    <span class="key">Operator</span>      <span>Björn Mattsson</span>
+    <span class="key">Custodians</span>    <span>3 (threshold: any 2)</span>
+    <span class="key">Document Ver.</span> <span>1.0 — Generated 2026-05-21 08:09:16 UTC</span>
+    <span class="key">Standards</span>     <span>EN 319 401 §7.5/7.6 · TS 119 431-1 V1.3.1</span>
+  </div>
+</div>
+
+
+<h3>1 · Purpose and Scope</h3>
+<p>This ceremony generates the Root CA private key inside a (no HSM) device and establishes a wrap key for key backup and recovery.</p>
+<p>This ceremony is performed in accordance with <strong>ETSI EN 319 401 V3.2.1 §7.5</strong> (Cryptographic Controls) and <strong>§7.6</strong> (Physical and Environmental Security). The Shamir Secret Sharing implementation is <strong>ssss</strong> (B. Poettering). Share encryption uses <strong>age</strong> with <strong>age-plugin-yubikey</strong> (str4d).</p>
+<div class="warn">
+  <strong>⚠ This is a security-sensitive ceremony.</strong>
+  All commands shall be executed only by the designated Operator in the presence of all custodians and witnesses.
+  No part of this ceremony shall be performed outside the designated secure room.
+  All mobile phones and networked devices must be removed before the ceremony begins.
+</div>
+
+
+<h3>2 · Personnel</h3>
+<table>
+  <thead><tr><th>Role</th><th>Name</th><th>Signature</th></tr></thead>
+  <tbody>
+    <tr><td>Ceremony Operator</td><td>Björn Mattsson</td><td class="sig-line"></td></tr>
+    <tr><td>Custodian 1</td><td>Sunet</td><td class="sig-line"></td></tr>
+    <tr><td>Custodian 2</td><td>DIGG 1</td><td class="sig-line"></td></tr>
+    <tr><td>Custodian 3</td><td>DIGG 2</td><td class="sig-line"></td></tr>
+    <tr><td>Witness 1</td><td>Frank Franzén</td><td class="sig-line"></td></tr>
+    <tr><td>Witness 2</td><td>Grace Gustafsson</td><td class="sig-line"></td></tr>
+    
+  </tbody>
+</table>
+
+
+<h3>3 · Pre-Ceremony Checklist</h3>
+
+<h4>3.1 Personnel Verification</h4>
+<ul class="checklist">
+  <li>All 3 custodians physically present — identity verified with government-issued photo ID</li>
+  <li>All 2 witnesses physically present</li>
+  <li>Ceremony operator present</li>
+  <li>No additional personnel in the room</li>
+  <li>All mobile phones and wireless devices removed from the room</li>
+</ul>
+
+<h4>3.2 Equipment</h4>
+<ul class="checklist">
+  <li>Air-gapped laptop — no WiFi hardware, or disabled at BIOS level; no network cable connected</li>
+  <li>Booted from verified read-only media (Tails OS recommended) or freshly installed offline OS</li>
+  <li>3 × YubiKey 5 Series (one per custodian) — factory-reset or known-good state</li>
+  <li>6 × dedicated USB drives (2 per custodian, labelled Custodian N — Copy 1/2 through 2/2, never previously used)</li>
+  <li>2 × dedicated USB drives labelled Private key backup 1/2 and 2/2, never previously used</li>
+  <li>1 × dedicated USB drive labelled Public certificate, never previously used</li>
+  <li>Video camera for ceremony recording — mandatory audit trail per EN 319 401 §7.6-13</li>
+  
+  
+  <li>Hardware RNG device — <code>/dev/ttyUSB0</code> (dedicated entropy source for key generation)</li>
+  <li>Printed copy of this ceremony script (this document)</li>
+  <li>Printed log sheets for recording ceremony artifacts</li>
+  <li>Permanent markers for labelling USB drives</li>
+  <li>9 × tamper-evident bags (one per USB drive + one per YubiKey)</li>
+  <li>2 × tamper-evident bags for USB drives with private key backup</li>
+</ul>
+
+<h4>3.3 Software (verify hashes before ceremony)</h4>
+<pre><span class="comment"># Verify installed tools</span>
+which ssss-split ssss-combine age age-plugin-yubikey ykman
+
+<span class="comment"># Print versions for ceremony log</span>
+ssss-split --version 2&gt;&amp;1 | head -1
+age --version
+age-plugin-yubikey --version
+ykman --version
+ent --version 2&gt;&amp;1 | head -1 || which ent
+rngtest --version 2&gt;&amp;1 | head -1</pre>
+<ul class="checklist">
+  <li>ssss installed — <code>apt install ssss</code> / <code>brew install ssss</code></li>
+  <li>age installed — <code>apt install age</code> / <code>brew install age</code></li>
+  <li>age-plugin-yubikey installed — binary from <code>github.com/str4d/age-plugin-yubikey/releases</code></li>
+  <li>ykman installed — <code>apt install yubikey-manager</code></li>
+  
+  
+  
+  <li>ent (entropy testing) installed — <code>apt install ent</code></li>
+  <li>rng-tools installed (provides rngtest) — <code>apt install rng-tools</code></li>
+  <li>All version strings recorded in ceremony log</li>
+</ul>
+
+<h4>3.4 Video Recording</h4>
+<ul class="checklist">
+  <li>Camera positioned to show the screen and all personnel — the ceremony is designed so that secret material is never displayed on screen</li>
+  <li>Recording started — announce on camera: organisation, CA name, ceremony type, date, time, location, and all personnel present by name and role</li>
+</ul>
+
+
+<h3>4 · Environment Setup</h3>
+
+<div class="step">
+  <div class="step-num">Step 1</div>
+  <strong>Verify Air-Gap</strong>
+  <p>The operator confirms on camera that the workstation has no network connectivity.</p>
+  <pre><span class="comment"># Verify no network interfaces are up</span>
+ip link show
+<span class="comment"># All interfaces other than loopback (lo) must show DOWN or be absent</span>
+
+ping -c 1 8.8.8.8 || echo &#34;CONFIRMED: No network (expected)&#34;</pre>
+  <ul class="checklist">
+    <li>All network interfaces confirmed DOWN or absent</li>
+    <li>Wireless hardware disabled and confirmed by physical inspection</li>
+  </ul>
+</div>
+
+<div class="step">
+  <div class="step-num">Step 2</div>
+  <strong>Prepare Working Directory</strong>
+  <pre><span class="comment"># Create a RAM-based working directory (tmpfs — never written to disk)</span>
+mkdir -p /tmp/ceremony
+chmod 700 /tmp/ceremony
+cd /tmp/ceremony
+
+<span class="comment"># Verify we are on tmpfs</span>
+df -T /tmp/ceremony
+<span class="comment"># Type column must show &#39;tmpfs&#39;</span></pre>
+  <ul class="checklist">
+    <li>Working directory confirmed on tmpfs (RAM only — no disk writes)</li>
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="step">
+  <div class="step-num">Step 4</div>
+  <strong>Verify Hardware RNG Device</strong>
+  <p>The signing key will be generated externally using a dedicated hardware random number generator. The RNG device must be identified and tested before use.</p>
+  <pre><span class="comment"># ── External RNG Device Verification ──</span>
+<span class="comment"># RNG device: /dev/ttyUSB0</span>
+
+<span class="comment"># Verify the device exists and is readable</span>
+test -r /dev/ttyUSB0 &amp;&amp; echo &#34;RNG device /dev/ttyUSB0: accessible ✓&#34; || echo &#34;FAIL: /dev/ttyUSB0 not found or not readable&#34;
+
+<span class="comment"># Identify the hardware RNG</span>
+cat /sys/class/misc/hw_random/rng_current 2&gt;/dev/null || echo &#34;(kernel hw_random not applicable)&#34;
+cat /sys/class/misc/hw_random/rng_available 2&gt;/dev/null || echo &#34;(no kernel RNG info)&#34;
+</pre>
+  <ul class="checklist">
+    <li>RNG device <code>/dev/ttyUSB0</code> present and readable</li>
+    <li>Hardware RNG identity recorded in ceremony log</li>
+  </ul>
+</div>
+
+<div class="step">
+  <div class="step-num">Step 5</div>
+  <strong>RNG Entropy Quality Tests</strong>
+  <p>Before using the hardware RNG for key generation, statistical tests confirm the entropy source produces sufficient randomness. All tests must pass.</p>
+  <pre><span class="comment"># ── RNG Entropy Quality Tests ──</span>
+<span class="comment"># Collect a test sample from the RNG device</span>
+dd if=/dev/ttyUSB0 of=/tmp/ceremony/rng-sample.bin bs=1024 count=256 2&gt;/dev/null
+echo &#34;Collected 256 KiB sample for entropy testing&#34;
+
+<span class="comment"># Test 1: ent — basic entropy estimation</span>
+<span class="comment"># Ideal: entropy ≈ 7.999 bits/byte, chi-square 1-99%</span>
+ent /tmp/ceremony/rng-sample.bin
+
+<span class="comment"># Test 2: rngtest (from rng-tools) — FIPS 140-2 statistical tests</span>
+<span class="comment"># Runs Monobit, Poker, Runs, and Long Runs tests</span>
+<span class="comment"># Acceptable: 0 failures in 1000+ blocks</span>
+dd if=/dev/ttyUSB0 bs=2500 count=101 2&gt;/dev/null | rngtest --blockcount=100
+
+<span class="comment"># Test 3: Compression ratio — truly random data is incompressible</span>
+ORIG=$(wc -c &lt; /tmp/ceremony/rng-sample.bin)
+gzip -c /tmp/ceremony/rng-sample.bin | wc -c | awk -v orig=&#34;$ORIG&#34; &#39;{printf &#34;Compression ratio: %.4f (ideal ≈ 1.00)\\n&#34;, $1/orig}&#39;
+
+<span class="comment"># Test 4: Check for stuck bits (compare two independent samples)</span>
+dd if=/dev/ttyUSB0 of=/tmp/ceremony/rng-sample2.bin bs=1024 count=256 2&gt;/dev/null
+if cmp -s /tmp/ceremony/rng-sample.bin /tmp/ceremony/rng-sample2.bin; then
+  echo &#34;FAIL: Two samples are identical — RNG may be stuck!&#34;
+  exit 1
+else
+  echo &#34;CONFIRMED: Samples differ ✓&#34;
+fi
+
+<span class="comment"># Clean up test samples</span>
+shred -u /tmp/ceremony/rng-sample.bin /tmp/ceremony/rng-sample2.bin</pre>
+  <ul class="checklist">
+    <li>ent: entropy ≥ 7.99 bits/byte</li>
+    <li>ent: chi-square between 1% and 99%</li>
+    <li>rngtest: FIPS 140-2 tests — 0 failures</li>
+    <li>Compression ratio ≥ 0.99 (incompressible)</li>
+    <li>Two independent samples confirmed different</li>
+  </ul>
+  <div class="warn">
+    <strong>⚠ If any test fails, STOP the ceremony.</strong>
+    Do not proceed with key generation. Replace or investigate the RNG device before restarting.
+  </div>
+</div>
+
+
+
+<h3>5 · Custodian YubiKey Enrollment</h3>
+<p>Each custodian's YubiKey is enrolled with a PIV key used as the age recipient for their SSS share. Complete this for all 3 custodians before generating the secret.</p>
+<div class="warn">
+  <strong>⚠ One YubiKey at a time.</strong>
+  Only one YubiKey should be inserted during each enrollment step.
+  After enrollment, remove the YubiKey and return it to the custodian immediately.
+</div>
+
+
+<h4>Custodian 1: Sunet</h4>
+<p>Insert Sunet's YubiKey into the workstation's USB port.</p>
+<pre><span class="comment"># Verify YubiKey detected</span>
+ykman info
+
+<span class="comment"># Note serial number (record in ceremony log)</span>
+ykman info | grep &#34;Serial number&#34;
+
+<span class="comment"># Change PIV PIN (default 123456) and PUK (default 12345678)</span>
+ykman piv access change-pin
+ykman piv access change-puk
+
+<span class="comment"># Generate EC P-256 key on slot 9d (Key Management) — key stays on device</span>
+age-plugin-yubikey --generate --slot 4
+<span class="comment"># Slot mapping: 1=9a  2=9c  3=9e  4=9d (Key Management)</span>
+
+<span class="comment"># List all age-compatible identities on this YubiKey</span>
+age-plugin-yubikey --list
+
+<span class="comment"># RECORD recipient string for Custodian 1:</span>
+C1_RECIPIENT=&#34;age1yubikey1[paste full recipient string here]&#34;</pre>
+<div class="ok">☑ Record in ceremony log — Custodian 1 · YubiKey Serial No.: __________ · age recipient: <code>age1yubikey1___________</code></div>
+<p>Remove Sunet's YubiKey before proceeding to the next custodian.</p>
+
+<h4>Custodian 2: DIGG 1</h4>
+<p>Insert DIGG 1's YubiKey into the workstation's USB port.</p>
+<pre><span class="comment"># Verify YubiKey detected</span>
+ykman info
+
+<span class="comment"># Note serial number (record in ceremony log)</span>
+ykman info | grep &#34;Serial number&#34;
+
+<span class="comment"># Change PIV PIN (default 123456) and PUK (default 12345678)</span>
+ykman piv access change-pin
+ykman piv access change-puk
+
+<span class="comment"># Generate EC P-256 key on slot 9d (Key Management) — key stays on device</span>
+age-plugin-yubikey --generate --slot 4
+<span class="comment"># Slot mapping: 1=9a  2=9c  3=9e  4=9d (Key Management)</span>
+
+<span class="comment"># List all age-compatible identities on this YubiKey</span>
+age-plugin-yubikey --list
+
+<span class="comment"># RECORD recipient string for Custodian 2:</span>
+C2_RECIPIENT=&#34;age1yubikey1[paste full recipient string here]&#34;</pre>
+<div class="ok">☑ Record in ceremony log — Custodian 2 · YubiKey Serial No.: __________ · age recipient: <code>age1yubikey1___________</code></div>
+<p>Remove DIGG 1's YubiKey before proceeding to the next custodian.</p>
+
+<h4>Custodian 3: DIGG 2</h4>
+<p>Insert DIGG 2's YubiKey into the workstation's USB port.</p>
+<pre><span class="comment"># Verify YubiKey detected</span>
+ykman info
+
+<span class="comment"># Note serial number (record in ceremony log)</span>
+ykman info | grep &#34;Serial number&#34;
+
+<span class="comment"># Change PIV PIN (default 123456) and PUK (default 12345678)</span>
+ykman piv access change-pin
+ykman piv access change-puk
+
+<span class="comment"># Generate EC P-256 key on slot 9d (Key Management) — key stays on device</span>
+age-plugin-yubikey --generate --slot 4
+<span class="comment"># Slot mapping: 1=9a  2=9c  3=9e  4=9d (Key Management)</span>
+
+<span class="comment"># List all age-compatible identities on this YubiKey</span>
+age-plugin-yubikey --list
+
+<span class="comment"># RECORD recipient string for Custodian 3:</span>
+C3_RECIPIENT=&#34;age1yubikey1[paste full recipient string here]&#34;</pre>
+<div class="ok">☑ Record in ceremony log — Custodian 3 · YubiKey Serial No.: __________ · age recipient: <code>age1yubikey1___________</code></div>
+<p>Remove DIGG 2's YubiKey before proceeding to the next custodian.</p>
+
+
+<div class="ok">☑ Verification: All 3 custodian age recipient strings recorded in ceremony log before proceeding.</div>
+
+
+
+<h3>6 · Secret Generation</h3>
+
+
+<p>The Root CA private key is generated <strong>outside</strong> the HSM using a dedicated hardware RNG (<code>/dev/ttyUSB0</code>), which was verified in Section 4. The key will be imported into the (no HSM) after generation. A wrap key is also generated from the same RNG for encrypted key backup.</p>
+<div class="step">
+  <div class="step-num">Step 6a</div>
+  <strong>Generate Root CA Key from Hardware RNG</strong>
+  <pre><span class="comment"># Generate EC P-384 private key using hardware RNG: /dev/ttyUSB0</span>
+<span class="comment"># Key is generated OUTSIDE the HSM and will be imported after wrapping.</span>
+openssl ecparam -genkey -name secp384r1 -rand /dev/ttyUSB0 -noout -out ca-key.pem
+
+<span class="comment"># Extract public key</span>
+openssl ec -in ca-key.pem -pubout -out root-ca-pubkey.pem
+cat root-ca-pubkey.pem
+
+<span class="comment"># Verify key is valid</span>
+openssl ec -in ca-key.pem -check -noout
+echo &#34;Example Root CA G1 signing key generated from external RNG ✓&#34;
+
+<span class="comment"># Convert private key to DER for HSM import</span>
+openssl ec -in ca-key.pem -outform DER -out ca-key.der
+
+<span class="comment"># The private key will be imported into the HSM and then securely erased from RAM.</span></pre>
+  <ul class="checklist">
+    <li>EC P-384 key generated from <code>/dev/ttyUSB0</code></li>
+    <li>Public key exported and recorded</li>
+    <li>Key validity confirmed by OpenSSL</li>
+  </ul>
+</div>
+<div class="step">
+  <div class="step-num">Step 6b</div>
+  <strong>Generate Wrap Key from Hardware RNG</strong>
+  <pre><span class="comment"># Generate 256-bit (32-byte) wrap key from hardware RNG</span>
+<span class="comment"># Source: /dev/ttyUSB0 (tested above)</span>
+WRAP_KEY=$(dd if=/dev/ttyUSB0 bs=32 count=1 2&gt;/dev/null | xxd -p | tr -d &#39;\n&#39;)
+
+<span class="comment"># Verify length — must be exactly 64 hex characters</span>
+echo &#34;Key length (chars): $(echo -n &#34;${WRAP_KEY}&#34; | wc -c)&#34;
+<span class="comment"># Expected: 64</span>
+
+<span class="comment"># Show only first 4 and last 4 hex chars for witness confirmation</span>
+<span class="comment"># The full key is NEVER displayed on screen (camera is recording)</span>
+echo &#34;WRAP KEY fingerprint: ${WRAP_KEY:0:4}....${WRAP_KEY: -4}&#34;
+
+<span class="comment"># Source confirmed: hardware RNG /dev/ttyUSB0</span></pre>
+  <ul class="checklist">
+    <li>Key length confirmed: 64 hex characters (256 bits)</li>
+    <li>First 4 and last 4 hex chars confirmed by all witnesses</li>
+  </ul>
+</div>
+<div class="step">
+  <div class="step-num">Step 6c</div>
+
+  <strong>Generate Self-Signed Certificate</strong>
+  <p>The externally generated private key is used to create a self-signed certificate.</p>
+  <pre><span class="comment"># Create openssl.cnf to be used while generating certificate request</span>
+cat &gt; openssl.cnf &lt;&lt; EOF
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+basicConstraints = critical,CA:true
+EOF
+
+<span class="comment"># Generate certificate request</span>
+openssl req -new -key ca-key.pem -out ca-cert.req -subj &#39;/CN=Sweden Connect Trust Anchor/O=Sweden Connect/C=SE&#39;
+
+<span class="comment"># Generate self-signed certificate</span>
+openssl x509 -req -days 7300 -in ca-cert.req -signkey ca-key.pem -out ca-cert.pem \
+   -extfile openssl.cnf -extensions v3_ca
+</pre>
+  <ul class="checklist">
+    <li>openssl.cnf created</li>
+    <li>Certificate request created</li>
+    <li>Self-signed certificate created</li>
+  </ul>
+</div>
+<div class="step">
+  <div class="step-num">Step 6d</div>
+
+
+  <strong>Export encrypted CA Key into USB</strong>
+  <p>The externally generated private key is exported into a USB stick. After export, the plaintext key is securely erased from the workstation.</p>
+  <pre><span class="comment"># Export externally generated key into USB</span>
+echo ${WRAP_KEY} | openssl ec -aes256 -in ca-key.pem \
+  -out ca-key-backup.pem -passout stdin
+
+<span class="comment"># Securely erase the plaintext private key</span>
+shred -u ca-key.pem ca-key.der
+echo &#34;Private key securely erased from workstation ✓&#34;</pre>
+  <ul class="checklist">
+    <li>Plaintext key securely erased from workstation RAM</li>
+  </ul>
+</div>
+<p>Copy <code>ca-key-backup.pem</code> to a dedicated USB drive. Eject the drive and place in a separate tamper-evident bag.</p>
+<table>
+  <thead><tr><th>Copy</th><th>USB Label</th><th>Storage Location</th><th>Copied ☑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1/2</td>
+      <td class="mono">Private key backup 1/2</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>2/2</td>
+      <td class="mono">Private key backup 2/2</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+  </tbody>
+</table>
+
+
+<p>Copy <code>ca-cert.pem</code> to a dedicated USB drive. Eject the drive, we do not need to place this in a tamper-evident bag since it contains no sensitive information.</p>
+<table>
+  <thead><tr><th>Copy</th><th>USB Label</th><th>Storage Location</th><th>Copied ☑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1/1</td>
+      <td class="mono">Public certificate</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+
+<h3>7 · Shamir Secret Sharing — Split (2-of-3)</h3>
+<div class="warn">
+  <strong>⚠ All 3 custodians must be present during this step.</strong>
+  Share values are written directly to individual files and are never displayed on screen.
+  This is the most sensitive moment of the ceremony.
+</div>
+
+<div class="step">
+  <div class="step-num">Step 7</div>
+  <strong>Split Secret into 3 Shares</strong>
+  <pre><span class="comment"># Split wrap key into 3 shares, threshold 2</span>
+<span class="comment"># -t 2  = minimum shares required to reconstruct</span>
+<span class="comment"># -n 3  = total shares generated</span>
+<span class="comment"># -x   = hex input/output mode (required for binary secrets)</span>
+<span class="comment"># -s 256 = prime field size in bits (must be &gt;= secret bit length)</span>
+<span class="comment"># Output is written directly to individual share files (never shown on screen)</span>
+echo -n &#34;${WRAP_KEY}&#34; | ssss-split -t 2 -n 3 -x -s 256 | while IFS= read -r line; do
+  NUM=$(echo &#34;$line&#34; | cut -d- -f1)
+  echo &#34;$line&#34; &gt; &#34;share-${NUM}.txt&#34;
+  echo &#34;Share ${NUM} written to share-${NUM}.txt&#34;
+done
+
+<span class="comment"># Confirm all 3 share files exist</span>
+ls -1 share-*.txt | wc -l
+<span class="comment"># Expected: 3</span></pre>
+  <p>Shares are written directly to individual files. Record share numbers (NOT values) in the ceremony log.</p>
+  <table>
+    <thead><tr><th>Share #</th><th>Assigned Custodian</th><th>Confirmed Written ☑</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Sunet</td>
+        <td>☐</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>DIGG 1</td>
+        <td>☐</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>DIGG 2</td>
+        <td>☐</td>
+      </tr>
+      
+    </tbody>
+  </table>
+  <div class="notes">
+    <strong>Notes</strong>
+    <div class="notes-area"></div>
+  </div>
+</div>
+
+
+<h3>8 · Share Encryption</h3>
+<p>Each share is encrypted to its custodian's YubiKey using <code>age</code>. The custodian's physical YubiKey and PIN are required at reconstruction time; the encrypted file alone is useless without the device.</p>
+
+
+<h4>Encrypt Share 1 → Sunet</h4>
+<pre><span class="comment"># Set recipient for Custodian 1</span>
+C1_RECIPIENT=&#34;age1yubikey1[paste Custodian 1 recipient string]&#34;
+
+<span class="comment"># Encrypt share — only Custodian 1&#39;s YubiKey can decrypt this</span>
+cat &#34;share-1.txt&#34; | age -r &#34;${C1_RECIPIENT}&#34; -o custodian1.share.age
+
+ls -lh custodian1.share.age</pre>
+
+<p>Copy <code>custodian1.share.age</code> to each of 2 dedicated USB drives for Custodian 1. Eject each drive and place in a separate tamper-evident bag. Place the YubiKey in a separate bag.</p>
+<table>
+  <thead><tr><th>Copy</th><th>USB Label</th><th>Storage Location</th><th>Copied ☑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1/2</td>
+      <td class="mono">Custodian 1 — Copy 1</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>2/2</td>
+      <td class="mono">Custodian 1 — Copy 2</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+
+<h4>Encrypt Share 2 → DIGG 1</h4>
+<pre><span class="comment"># Set recipient for Custodian 2</span>
+C2_RECIPIENT=&#34;age1yubikey1[paste Custodian 2 recipient string]&#34;
+
+<span class="comment"># Encrypt share — only Custodian 2&#39;s YubiKey can decrypt this</span>
+cat &#34;share-2.txt&#34; | age -r &#34;${C2_RECIPIENT}&#34; -o custodian2.share.age
+
+ls -lh custodian2.share.age</pre>
+
+<p>Copy <code>custodian2.share.age</code> to each of 2 dedicated USB drives for Custodian 2. Eject each drive and place in a separate tamper-evident bag. Place the YubiKey in a separate bag.</p>
+<table>
+  <thead><tr><th>Copy</th><th>USB Label</th><th>Storage Location</th><th>Copied ☑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1/2</td>
+      <td class="mono">Custodian 2 — Copy 1</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>2/2</td>
+      <td class="mono">Custodian 2 — Copy 2</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+
+<h4>Encrypt Share 3 → DIGG 2</h4>
+<pre><span class="comment"># Set recipient for Custodian 3</span>
+C3_RECIPIENT=&#34;age1yubikey1[paste Custodian 3 recipient string]&#34;
+
+<span class="comment"># Encrypt share — only Custodian 3&#39;s YubiKey can decrypt this</span>
+cat &#34;share-3.txt&#34; | age -r &#34;${C3_RECIPIENT}&#34; -o custodian3.share.age
+
+ls -lh custodian3.share.age</pre>
+
+<p>Copy <code>custodian3.share.age</code> to each of 2 dedicated USB drives for Custodian 3. Eject each drive and place in a separate tamper-evident bag. Place the YubiKey in a separate bag.</p>
+<table>
+  <thead><tr><th>Copy</th><th>USB Label</th><th>Storage Location</th><th>Copied ☑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1/2</td>
+      <td class="mono">Custodian 3 — Copy 1</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>2/2</td>
+      <td class="mono">Custodian 3 — Copy 2</td>
+      <td>__________</td>
+      <td>☐</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+
+
+<div class="ok">☑ All 3 custodian share files encrypted and distributed.</div>
+
+
+
+
+
+
+
+<h3>9 · Verification</h3>
+<div class="warn"><strong>⚠ All custodians must remain in the room during verification.</strong></div>
+<p>Before destroying plaintext material, verify that 2 shares reconstruct the original secret.</p>
+
+<div class="step">
+  <div class="step-num">Step 9a</div>
+  <strong>Test Reconstruction with 2 Shares</strong>
+  <pre><span class="comment"># Decrypt test shares — each participating custodian inserts their YubiKey</span>
+<span class="comment"># age-plugin-yubikey will prompt for PIV PIN</span>
+
+<span class="comment"># Custodian 1 — insert YubiKey, then:</span>
+age-plugin-yubikey --identity | age --decrypt -i - custodian1.share.age &gt; share1.txt
+
+<span class="comment"># Custodian 2 — insert YubiKey, then:</span>
+age-plugin-yubikey --identity | age --decrypt -i - custodian2.share.age &gt; share2.txt
+
+<span class="comment"># Combine the 2 decrypted shares</span>
+cat share1.txt share2.txt | ssss-combine -t 2 -x &gt; reconstructed.txt
+
+<span class="comment"># Automated comparison — secrets are NOT displayed on screen</span>
+if [ &#34;$(cat reconstructed.txt)&#34; = &#34;${WRAP_KEY}&#34; ]; then
+  echo &#34;VERIFICATION PASSED — reconstructed key matches original&#34;
+else
+  echo &#34;VERIFICATION FAILED — keys do not match&#34;
+fi
+
+<span class="comment"># Wipe reconstruction artifact</span>
+shred -u reconstructed.txt</pre>
+  <ul class="checklist">
+    <li>Reconstructed secret matches original wrap key — confirmed by automated comparison (no secrets shown on screen)</li>
+    <li>Test share files wiped immediately: <code>shred -u share*.txt</code></li>
+  </ul>
+  <div class="notes">
+    <strong>Notes</strong>
+    <div class="notes-area"></div>
+  </div>
+</div>
+
+
+
+
+
+<h3>10 · Secure Cleanup</h3>
+<div class="warn"><strong>⚠ This step is mandatory and must not be skipped.</strong> All plaintext key material must be destroyed before leaving the secure room.</div>
+
+<div class="step">
+  <div class="step-num">Step 10</div>
+  <strong>Wipe All Plaintext Material</strong>
+  <pre><span class="comment"># Securely wipe all ceremony working files</span>
+shred -vzn 3 /tmp/ceremony/*
+rm -rf /tmp/ceremony
+
+<span class="comment"># Clear shell history</span>
+history -c
+
+<span class="comment"># Unset all environment variables containing key material</span>
+unset WRAP_KEY
+for i in $(seq 1 20); do unset C${i}_RECIPIENT; done
+
+echo &#34;Cleanup complete — power off the workstation now&#34;</pre>
+  <ul class="checklist">
+    <li>All files in /tmp/ceremony securely wiped (shred confirmed)</li>
+    <li>Shell history cleared</li>
+    <li>WRAP_KEY and all C<em>N</em>_RECIPIENT variables unset</li>
+    <li>Terminal window closed</li>
+    <li>Workstation powered off (not suspended or hibernated)</li>
+    <li>Video recording stopped — confirm saved to ceremony archive</li>
+  </ul>
+  <div class="notes">
+    <strong>Notes</strong>
+    <div class="notes-area"></div>
+  </div>
+</div>
+
+
+<h3>11 · Ceremony Record</h3>
+<p>Record the following in the formal ceremony log. Retain for a minimum of <strong>7 years</strong> after the associated CA certificate ceases to be valid (TS 119 431-1 §6.4.6).</p>
+<table>
+  <thead><tr><th>Item</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Organisation</td><td>Example Organisation AB</td></tr>
+    <tr><td>CA Name</td><td>Example Root CA G1</td></tr>
+    <tr><td>Ceremony Type</td><td>Root CA — HSM Key Generation</td></tr>
+    <tr><td>Date and Time</td><td>2026-05-11 ____:____ UTC</td></tr>
+    <tr><td>Location</td><td>Atle , Tulegan 11, Stockholm</td></tr>
+    <tr><td>Operator</td><td>Björn Mattsson</td></tr>
+    <tr><td>SSS Parameters</td><td>2-of-3</td></tr>
+    <tr><td>Share Storage</td><td>Each encrypted share file (custodianN.share.age) is written to 2 dedicated USB drives per custodian for redundancy. Copies must be stored in separate physical locations.</td></tr>
+    
+    
+    
+    <tr><td>HSM Type</td><td>None</td></tr>
+    
+    <tr><td>Video Recording Reference</td><td>__________</td></tr>
+  </tbody>
+</table>
+
+<h4>Custodian Share Assignment</h4>
+<table>
+  <thead><tr><th>#</th><th>Custodian</th><th>YubiKey Serial</th><th>age Recipient (first 24 chars)</th><th>Share File</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Sunet</td>
+      <td>__________</td>
+      <td class="mono">age1yubikey1____________…</td>
+      <td class="mono">custodian1.share.age</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>DIGG 1</td>
+      <td>__________</td>
+      <td class="mono">age1yubikey1____________…</td>
+      <td class="mono">custodian2.share.age</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>DIGG 2</td>
+      <td>__________</td>
+      <td class="mono">age1yubikey1____________…</td>
+      <td class="mono">custodian3.share.age</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+
+<div class="page-break"></div>
+<h3>12 · Signature Page</h3>
+<p>By signing below, each party confirms that they were present throughout the ceremony, that it was conducted in accordance with this procedure, and that the ceremony log accurately reflects what occurred.</p>
+
+<h4>Ceremony Operator</h4>
+<table>
+  <thead><tr><th>Name</th><th>Signature</th><th>Date</th></tr></thead>
+  <tbody><tr><td>Björn Mattsson</td><td class="sig-line"></td><td class="sig-line"></td></tr></tbody>
+</table>
+
+<h4>Custodians</h4>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>YubiKey Serial</th><th>Signature</th><th>Share Received ☑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Sunet</td>
+      <td>__________</td>
+      <td class="sig-line"></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>DIGG 1</td>
+      <td>__________</td>
+      <td class="sig-line"></td>
+      <td>☐</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>DIGG 2</td>
+      <td>__________</td>
+      <td class="sig-line"></td>
+      <td>☐</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+<h4>Witnesses</h4>
+<table>
+  <thead><tr><th>Name</th><th>Signature</th><th>Date</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Frank Franzén</td>
+      <td class="sig-line"></td>
+      <td class="sig-line"></td>
+    </tr>
+    <tr>
+      <td>Grace Gustafsson</td>
+      <td class="sig-line"></td>
+      <td class="sig-line"></td>
+    </tr>
+    
+  </tbody>
+</table>
+
+<p style="margin-top:40px;font-size:11px;color:#9ca3af">
+  Generated by go-root-ceremony · github.com/sirosfoundation/go-root-ceremony ·
+  Standards: ETSI EN 319 401 V3.2.1, ETSI TS 119 431-1 V1.3.1 ·
+  Generated: 2026-05-21 08:09:16 UTC
+</p>
+
+</body>
+</html>
