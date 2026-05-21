@@ -99,7 +99,7 @@ td { padding: 7px 10px; border: 1px solid var(--border); vertical-align: top; }
     <span class="key">Location</span>      <span>Atle , Tulegan 11, Stockholm</span>
     <span class="key">Operator</span>      <span>Björn Mattsson</span>
     <span class="key">Custodians</span>    <span>3 (threshold: any 2)</span>
-    <span class="key">Document Ver.</span> <span>1.0 — Generated 2026-05-21 08:09:16 UTC</span>
+    <span class="key">Document Ver.</span> <span>1.0 — Generated 2026-05-21 11:48:15 UTC</span>
     <span class="key">Standards</span>     <span>EN 319 401 §7.5/7.6 · TS 119 431-1 V1.3.1</span>
   </div>
 </div>
@@ -153,7 +153,7 @@ td { padding: 7px 10px; border: 1px solid var(--border); vertical-align: top; }
   <li>Video camera for ceremony recording — mandatory audit trail per EN 319 401 §7.6-13</li>
   
   
-  <li>Hardware RNG device — <code>/dev/ttyUSB0</code> (dedicated entropy source for key generation)</li>
+  <li>Hardware RNG device — <code>/dev/hwrng</code> (dedicated entropy source for key generation)</li>
   <li>Printed copy of this ceremony script (this document)</li>
   <li>Printed log sheets for recording ceremony artifacts</li>
   <li>Permanent markers for labelling USB drives</li>
@@ -235,17 +235,17 @@ df -T /tmp/ceremony
   <strong>Verify Hardware RNG Device</strong>
   <p>The signing key will be generated externally using a dedicated hardware random number generator. The RNG device must be identified and tested before use.</p>
   <pre><span class="comment"># ── External RNG Device Verification ──</span>
-<span class="comment"># RNG device: /dev/ttyUSB0</span>
+<span class="comment"># RNG device: /dev/hwrng</span>
 
 <span class="comment"># Verify the device exists and is readable</span>
-test -r /dev/ttyUSB0 &amp;&amp; echo &#34;RNG device /dev/ttyUSB0: accessible ✓&#34; || echo &#34;FAIL: /dev/ttyUSB0 not found or not readable&#34;
+test -r /dev/hwrng &amp;&amp; echo &#34;RNG device /dev/hwrng: accessible ✓&#34; || echo &#34;FAIL: /dev/hwrng not found or not readable&#34;
 
 <span class="comment"># Identify the hardware RNG</span>
 cat /sys/class/misc/hw_random/rng_current 2&gt;/dev/null || echo &#34;(kernel hw_random not applicable)&#34;
 cat /sys/class/misc/hw_random/rng_available 2&gt;/dev/null || echo &#34;(no kernel RNG info)&#34;
 </pre>
   <ul class="checklist">
-    <li>RNG device <code>/dev/ttyUSB0</code> present and readable</li>
+    <li>RNG device <code>/dev/hwrng</code> present and readable</li>
     <li>Hardware RNG identity recorded in ceremony log</li>
   </ul>
 </div>
@@ -256,7 +256,7 @@ cat /sys/class/misc/hw_random/rng_available 2&gt;/dev/null || echo &#34;(no kern
   <p>Before using the hardware RNG for key generation, statistical tests confirm the entropy source produces sufficient randomness. All tests must pass.</p>
   <pre><span class="comment"># ── RNG Entropy Quality Tests ──</span>
 <span class="comment"># Collect a test sample from the RNG device</span>
-dd if=/dev/ttyUSB0 of=/tmp/ceremony/rng-sample.bin bs=1024 count=256 2&gt;/dev/null
+dd if=/dev/hwrng of=/tmp/ceremony/rng-sample.bin bs=1024 count=256 2&gt;/dev/null
 echo &#34;Collected 256 KiB sample for entropy testing&#34;
 
 <span class="comment"># Test 1: ent — basic entropy estimation</span>
@@ -266,14 +266,14 @@ ent /tmp/ceremony/rng-sample.bin
 <span class="comment"># Test 2: rngtest (from rng-tools) — FIPS 140-2 statistical tests</span>
 <span class="comment"># Runs Monobit, Poker, Runs, and Long Runs tests</span>
 <span class="comment"># Acceptable: 0 failures in 1000+ blocks</span>
-dd if=/dev/ttyUSB0 bs=2500 count=101 2&gt;/dev/null | rngtest --blockcount=100
+dd if=/dev/hwrng bs=2500 count=101 2&gt;/dev/null | rngtest --blockcount=100
 
 <span class="comment"># Test 3: Compression ratio — truly random data is incompressible</span>
 ORIG=$(wc -c &lt; /tmp/ceremony/rng-sample.bin)
 gzip -c /tmp/ceremony/rng-sample.bin | wc -c | awk -v orig=&#34;$ORIG&#34; &#39;{printf &#34;Compression ratio: %.4f (ideal ≈ 1.00)\\n&#34;, $1/orig}&#39;
 
 <span class="comment"># Test 4: Check for stuck bits (compare two independent samples)</span>
-dd if=/dev/ttyUSB0 of=/tmp/ceremony/rng-sample2.bin bs=1024 count=256 2&gt;/dev/null
+dd if=/dev/hwrng of=/tmp/ceremony/rng-sample2.bin bs=1024 count=256 2&gt;/dev/null
 if cmp -s /tmp/ceremony/rng-sample.bin /tmp/ceremony/rng-sample2.bin; then
   echo &#34;FAIL: Two samples are identical — RNG may be stuck!&#34;
   exit 1
@@ -315,9 +315,9 @@ ykman info
 <span class="comment"># Note serial number (record in ceremony log)</span>
 ykman info | grep &#34;Serial number&#34;
 
-<span class="comment"># Change PIV PIN (default 123456) and PUK (default 12345678)</span>
-ykman piv access change-pin
-ykman piv access change-puk
+<span class="comment"># Protect the management key</span>
+<span class="comment"># Default PIV PIN 123456 and PUK 12345678</span>
+ykman piv access change-management-key -a TDES --protect
 
 <span class="comment"># Generate EC P-256 key on slot 9d (Key Management) — key stays on device</span>
 age-plugin-yubikey --generate --slot 4
@@ -339,9 +339,9 @@ ykman info
 <span class="comment"># Note serial number (record in ceremony log)</span>
 ykman info | grep &#34;Serial number&#34;
 
-<span class="comment"># Change PIV PIN (default 123456) and PUK (default 12345678)</span>
-ykman piv access change-pin
-ykman piv access change-puk
+<span class="comment"># Protect the management key</span>
+<span class="comment"># Default PIV PIN 123456 and PUK 12345678</span>
+ykman piv access change-management-key -a TDES --protect
 
 <span class="comment"># Generate EC P-256 key on slot 9d (Key Management) — key stays on device</span>
 age-plugin-yubikey --generate --slot 4
@@ -363,9 +363,9 @@ ykman info
 <span class="comment"># Note serial number (record in ceremony log)</span>
 ykman info | grep &#34;Serial number&#34;
 
-<span class="comment"># Change PIV PIN (default 123456) and PUK (default 12345678)</span>
-ykman piv access change-pin
-ykman piv access change-puk
+<span class="comment"># Protect the management key</span>
+<span class="comment"># Default PIV PIN 123456 and PUK 12345678</span>
+ykman piv access change-management-key -a TDES --protect
 
 <span class="comment"># Generate EC P-256 key on slot 9d (Key Management) — key stays on device</span>
 age-plugin-yubikey --generate --slot 4
@@ -387,13 +387,13 @@ C3_RECIPIENT=&#34;age1yubikey1[paste full recipient string here]&#34;</pre>
 <h3>6 · Secret Generation</h3>
 
 
-<p>The Root CA private key is generated <strong>outside</strong> the HSM using a dedicated hardware RNG (<code>/dev/ttyUSB0</code>), which was verified in Section 4. The key will be imported into the (no HSM) after generation. A wrap key is also generated from the same RNG for encrypted key backup.</p>
+<p>The Root CA private key is generated <strong>outside</strong> the HSM using a dedicated hardware RNG (<code>/dev/hwrng</code>), which was verified in Section 4. The key will be imported into the (no HSM) after generation. A wrap key is also generated from the same RNG for encrypted key backup.</p>
 <div class="step">
   <div class="step-num">Step 6a</div>
   <strong>Generate Root CA Key from Hardware RNG</strong>
-  <pre><span class="comment"># Generate EC P-384 private key using hardware RNG: /dev/ttyUSB0</span>
+  <pre><span class="comment"># Generate EC P-384 private key using hardware RNG: /dev/hwrng</span>
 <span class="comment"># Key is generated OUTSIDE the HSM and will be imported after wrapping.</span>
-openssl ecparam -genkey -name secp384r1 -rand /dev/ttyUSB0 -noout -out ca-key.pem
+openssl ecparam -genkey -name secp384r1 -rand /dev/hwrng -noout -out ca-key.pem
 
 <span class="comment"># Extract public key</span>
 openssl ec -in ca-key.pem -pubout -out root-ca-pubkey.pem
@@ -408,7 +408,7 @@ openssl ec -in ca-key.pem -outform DER -out ca-key.der
 
 <span class="comment"># The private key will be imported into the HSM and then securely erased from RAM.</span></pre>
   <ul class="checklist">
-    <li>EC P-384 key generated from <code>/dev/ttyUSB0</code></li>
+    <li>EC P-384 key generated from <code>/dev/hwrng</code></li>
     <li>Public key exported and recorded</li>
     <li>Key validity confirmed by OpenSSL</li>
   </ul>
@@ -417,8 +417,8 @@ openssl ec -in ca-key.pem -outform DER -out ca-key.der
   <div class="step-num">Step 6b</div>
   <strong>Generate Wrap Key from Hardware RNG</strong>
   <pre><span class="comment"># Generate 256-bit (32-byte) wrap key from hardware RNG</span>
-<span class="comment"># Source: /dev/ttyUSB0 (tested above)</span>
-WRAP_KEY=$(dd if=/dev/ttyUSB0 bs=32 count=1 2&gt;/dev/null | xxd -p | tr -d &#39;\n&#39;)
+<span class="comment"># Source: /dev/hwrng (tested above)</span>
+WRAP_KEY=$(dd if=/dev/hwrng bs=32 count=1 2&gt;/dev/null | xxd -p | tr -d &#39;\n&#39;)
 
 <span class="comment"># Verify length — must be exactly 64 hex characters</span>
 echo &#34;Key length (chars): $(echo -n &#34;${WRAP_KEY}&#34; | wc -c)&#34;
@@ -428,7 +428,7 @@ echo &#34;Key length (chars): $(echo -n &#34;${WRAP_KEY}&#34; | wc -c)&#34;
 <span class="comment"># The full key is NEVER displayed on screen (camera is recording)</span>
 echo &#34;WRAP KEY fingerprint: ${WRAP_KEY:0:4}....${WRAP_KEY: -4}&#34;
 
-<span class="comment"># Source confirmed: hardware RNG /dev/ttyUSB0</span></pre>
+<span class="comment"># Source confirmed: hardware RNG /dev/hwrng</span></pre>
   <ul class="checklist">
     <li>Key length confirmed: 64 hex characters (256 bits)</li>
     <li>First 4 and last 4 hex chars confirmed by all witnesses</li>
@@ -857,7 +857,7 @@ echo &#34;Cleanup complete — power off the workstation now&#34;</pre>
 <p style="margin-top:40px;font-size:11px;color:#9ca3af">
   Generated by go-root-ceremony · github.com/sirosfoundation/go-root-ceremony ·
   Standards: ETSI EN 319 401 V3.2.1, ETSI TS 119 431-1 V1.3.1 ·
-  Generated: 2026-05-21 08:09:16 UTC
+  Generated: 2026-05-21 11:48:15 UTC
 </p>
 
 </body>
